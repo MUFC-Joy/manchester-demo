@@ -275,7 +275,24 @@ function classify(tags, closed) {
   if (tags['natural'] === 'water') return 'water'
   if (tags.waterway) return 'waterway'
   if (tags.highway) return 'road'
-  if (tags.railway) return 'rail'
+  if (tags.railway) {
+    // 铁路只画"正在运营的走行线"（ Trafford Park 岔区实测：1,291 条里 604 条是
+    // siding/spur/yard/crossover 岔道 + razed 已拆除 + abandoned/disused 废弃 +
+    // construction 在建 + platform 站台，全画出来就是一坨灰扇面）。
+    const svc = tags.service
+    if (svc === 'spur' || svc === 'siding' || svc === 'yard' || svc === 'crossover') return null
+    const DEAD = new Set([
+      'razed',
+      'abandoned',
+      'disused',
+      'construction',
+      'proposed',
+      'platform',
+      'disused_station',
+    ])
+    if (DEAD.has(tags.railway)) return null
+    return 'rail'
+  }
   if (closed && GREEN_LEISURE.has(tags.leisure)) return 'green'
   if (closed && GREEN_LANDUSE.has(tags.landuse)) return 'green'
   return null

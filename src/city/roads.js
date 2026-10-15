@@ -16,8 +16,10 @@ import {
 export const ROAD_WIDTH = [16, 9, 5] // 主干 / 次干 / 支路，米（v2：主干加宽到 16m）
 const ROAD_Y = 1.0 // 略高于地面，避免 z-fighting
 const DASH_Y = 1.08 // 虚线略高于路面
-const RAIL_WIDTH = 3.4
-const RAIL_Y = 1.6
+// 铁路：细一档（3.4 太粗，多线并行岔区会糊成灰扇面）；高度压到路面之下，
+// 道路交叉口读作"路跨铁"，不再有灰带盖住马路
+const RAIL_WIDTH = 2.2
+const RAIL_Y = 0.8
 
 /**
  * 道格拉斯-普克简化（渲染前跑，与数据管线的 1.5m 简化解耦）。

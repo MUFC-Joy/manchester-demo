@@ -230,6 +230,10 @@
 - ET 特写：蓝座椅海 + 顶圈蓝环 + 草坪白线（灰巨环消失）✅
 - 夜景：窗光 + 深蓝水色 ✅；Tour 控制条/倍速/进度条/章节跳转 ✅；双击飞行 ✅
 
+### 补充（用户验收反馈）
+
+**铁路岔区灰扇面**：用户截图老特拉福德西侧一片灰乱。诊断：核心区 1,291 条铁路 way 里 604 条是杂项——23 条 razed（已拆除）、122 条 abandoned/disused（废弃）、160 siding + 47 spur + 15 yard + 60 crossover（岔道/库线）、94 platform（站台被画成灰带）。真实世界里那是 Trafford Park 铁路枢纽，数据没错，但我们把拆掉的轨道都画成了实体。修复：classify 只保留运营中的走行线（rail/light_rail，剔 service=spur/siding/yard/crossover 与 razed/abandoned/disused/construction/proposed/platform），铁轨 3.4m→2.2m、高度 1.6→0.8（路面之下，道口读作"路跨铁"）。铁路段数 1,273→679。
+
 ### 踩的坑
 
 1. **伊蒂哈德灰巨环**：不是屋顶悬挑（v2 文档只对了一半），是 `building=grandstand` 逃过排除规则 → 按"语义半径"剔除而非标签字面值。
