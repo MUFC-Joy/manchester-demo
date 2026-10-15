@@ -106,17 +106,28 @@ const camCurve = new THREE.CatmullRomCurve3(CAM_POINTS, false, 'centripetal', 0.
 const lookCurve = new THREE.CatmullRomCurve3(LOOK_POINTS, false, 'centripetal', 0.5)
 
 export const TOUR_DURATION = 78 // 秒
+export const TOUR_SPEEDS = [0.5, 1, 1.5, 2]
 
 export function createTour(camera, controls, { onChapter, onFinish } = {}) {
   let playing = false
   let t = 0
   let chapterIdx = -1
+  let speed = 1 // 倍速（v2 问题六）
 
-  const start = () => {
+  /** 把相机摆到参数 t（0~1）对应的位置（位置/目标都按缓动曲线取） */
+  function placeAt(tRaw) {
+    const e = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2
+    camera.position.copy(camCurve.getPointAt(Math.min(1, Math.max(0, e))))
+    controls.target.copy(lookCurve.getPointAt(Math.min(1, Math.max(0, e))))
+    controls.update()
+  }
+
+  const start = (fromT = 0) => {
     playing = true
-    t = 0
+    t = Math.min(0.999, Math.max(0, fromT))
     chapterIdx = -1
     controls.enabled = false
+    placeAt(t)
   }
 
   const stop = () => {
@@ -124,6 +135,36 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
     playing = false
     controls.enabled = true
     onFinish?.()
+  }
+
+  /** 点击进度条跳转：t ∈ [0,1] */
+  const seek = (t01) => {
+    if (!playing) return
+    t = Math.min(0.999, Math.max(0, t01))
+    chapterIdx = -1 // 强制重发当前章节字幕
+    placeAt(t)
+  }
+
+  /** 上一章 / 下一章：跳到章节起点（dir = -1 | 1） */
+  const chapterJump = (dir) => {
+    if (!playing) return
+    const n = CAM_POINTS.length - 1
+    let idx = 0
+    for (let i = CHAPTERS.length - 1; i >= 0; i--) {
+      if (t >= CHAPTERS[i].at / n) {
+        idx = i
+        break
+      }
+    }
+    // 前进：跳到下一章；后退：若已离开本章开头较多，先回本章开头
+    let target = idx
+    if (dir > 0) target = Math.min(CHAPTERS.length - 1, idx + 1)
+    else if (t - CHAPTERS[idx].at / n > 0.02) target = idx
+    else target = Math.max(0, idx - 1)
+
+    t = CHAPTERS[target].at / n + 0.001
+    chapterIdx = -1
+    placeAt(t)
   }
 
   /**
@@ -137,7 +178,7 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
     }
     if (!playing) return null
 
-    t += dt / TOUR_DURATION
+    t += (dt * speed) / TOUR_DURATION
 
     if (t >= 1) {
       stop()
@@ -149,15 +190,7 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
       return CHAPTERS[CHAPTERS.length - 1]
     }
 
-    // 缓动：前后稍慢，中段快
-    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-
-    const pos = camCurve.getPointAt(e)
-    const look = lookCurve.getPointAt(e)
-
-    camera.position.copy(pos)
-    controls.target.copy(look)
-    controls.update()
+    placeAt(t)
 
     // 章节字幕
     for (let i = CHAPTERS.length - 1; i >= 0; i--) {
@@ -176,6 +209,14 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
     start,
     stop,
     update,
+    seek,
+    chapterJump,
+    setSpeed(s) {
+      speed = s
+    },
+    get speed() {
+      return speed
+    },
     get playing() {
       return playing
     },

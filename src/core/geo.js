@@ -58,6 +58,14 @@ export function yawFromBearing(bearingDeg) {
 /** 全域 bbox：[south, west, north, east] */
 export const BBOX = [53.44, -2.33, 53.51, -2.13]
 
+/**
+ * 核心城区 bbox（v2 改造方案 §2，用户已拍板）：
+ *   西 = 老特拉福德 + 索尔福德码头，东 = 伊蒂哈德，
+ *   北 = 维多利亚车站一带，南 = Irwell 河南岸（老特拉福德以南）。
+ * 约 7.6km × 3.8km。市中心 / 两座球场 / 两大火车站 / 索尔福德码头全部在内。
+ */
+export const CORE_BBOX = [53.4585, -2.3075, 53.4925, -2.1930]
+
 /** 两座球场真实坐标 + 草坪长轴方位（度） */
 export const OT = {
   id: 'old-trafford',

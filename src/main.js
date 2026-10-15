@@ -27,12 +27,13 @@ import { createGreen } from './city/green.js'
 import { createTrees, createBuildingGrid } from './city/trees.js'
 import { createStreetLights } from './city/streetlights.js'
 import { createSky } from './city/sky.js'
+import { createLandmarks } from './city/landmarks.js'
 
 import { createOldTrafford } from './stadiums/oldTrafford.js'
 import { createEtihad } from './stadiums/etihad.js'
 
 import { createControls } from './camera/controls.js'
-import { createTour } from './camera/tour.js'
+import { createTour, syncControlsToCamera, TOUR_SPEEDS } from './camera/tour.js'
 import { createDayNight } from './core/daynight.js'
 import { createEggs } from './egg/egg.js'
 
@@ -120,6 +121,10 @@ async function main() {
   const etihad = await tick('建造伊蒂哈德…', () => createEtihad())
   scene.add(etihad.out)
 
+  // ── 地标标签层（v2 P5：15 个中英双语，可开关）──
+  const landmarksRes = await tick('挂地标标签…', () => createLandmarks())
+  const landmarks = landmarksRes.out
+
   // ── 配准自检 ──
   const otPos = ot.out.position
   const etPos = etihad.out.position
@@ -149,7 +154,7 @@ async function main() {
   console.log(`[树] ${trees.out.userData.count} 棵 · [路灯] ${lamps.out.group.userData.count} 盏`)
   setTitle(
     'MANCHESTER',
-    `${OT.name} · ${cityData.buildings.length} 栋建筑 · ` +
+    `核心城区 · ${OT.name} · ${cityData.buildings.length} 栋建筑 · ` +
       `配准误差 ${regError.toFixed(0)} m`
   )
 
@@ -170,7 +175,7 @@ async function main() {
   dayNight.registerLerp(sky.out.cloudMat, 'color', new THREE.Color('#ffffff'), new THREE.Color('#33455e'))
   dayNight.registerLerp(sky.out.cloudMat, 'emissiveIntensity', 0.5, 0.05)
   dayNight.registerLerp(sky.out.cloudMat, 'opacity', 0.95, 0.5)
-  dayNight.registerLerp(getWaterMaterial(), 'color', new THREE.Color('#6fb7d6'), new THREE.Color('#0f2f47'))
+  dayNight.registerLerp(getWaterMaterial(), 'color', new THREE.Color('#4380a6'), new THREE.Color('#0d2740'))
   dayNight.registerLerp(getWaterMaterial(), 'emissiveIntensity', 0.14, 0.4)
   dayNight.registerLerp(lamps.out.poleMat, 'opacity', 0, 1, true) // 灯杆夜里显形
   dayNight.registerLerp(lamps.out.headMat, 'opacity', 0, 1, true) // 路灯头夜里亮
@@ -194,6 +199,8 @@ async function main() {
     onFinish() {
       btnTour.textContent = '▶ 一键 Tour'
       btnTour.classList.remove('active')
+      tourCtrl?.classList.add('is-hidden')
+      tourBar?.classList.add('is-hidden')
     },
   })
 
@@ -201,6 +208,11 @@ async function main() {
   const btnTour = document.getElementById('btn-tour')
   const btnDayNight = document.getElementById('btn-daynight')
   const btnFree = document.getElementById('btn-free')
+  const btnLabels = document.getElementById('btn-labels')
+  const tourCtrl = document.getElementById('tour-ctrl')
+  const tourBar = document.getElementById('tour-bar')
+  const tourFill = document.getElementById('tour-fill')
+  const btnSpeed = document.getElementById('btn-speed')
 
   btnTour.addEventListener('click', () => {
     if (tour.playing) {
@@ -209,6 +221,8 @@ async function main() {
       btnTour.textContent = '■ 停止 Tour'
       btnTour.classList.add('active')
       tour.start()
+      tourCtrl?.classList.remove('is-hidden')
+      tourBar?.classList.remove('is-hidden')
     }
   })
 
@@ -218,12 +232,34 @@ async function main() {
     btnDayNight.classList.toggle('active', dayNight.isNight)
   })
 
+  // 自由视角：不再传送回老特拉福德（v2 问题三），
+  // 只停掉 Tour 并把注视点交给当前朝向——配合左键平移，想去哪就去哪
   btnFree.addEventListener('click', () => {
     tour.stop()
-    // 回到默认视角
-    controls.target.copy(otPos).setY(12)
-    camera.position.set(otPos.x + 620, 470, otPos.z + 780)
-    controls.update()
+    syncControlsToCamera(controls, camera)
+  })
+
+  // 地名标签开关（v2 P5）
+  btnLabels.addEventListener('click', () => {
+    landmarks.toggle(!landmarks.enabled)
+    btnLabels.classList.toggle('active', landmarks.enabled)
+  })
+  btnLabels.classList.add('active')
+
+  // Tour 倍速 / 章节跳转 / 进度条（v2 问题六）
+  btnSpeed.addEventListener('click', () => {
+    const idx = TOUR_SPEEDS.indexOf(tour.speed)
+    const next = TOUR_SPEEDS[(idx + 1) % TOUR_SPEEDS.length]
+    tour.setSpeed(next)
+    btnSpeed.textContent = `${next}×`
+  })
+
+  document.getElementById('btn-chapter-prev')?.addEventListener('click', () => tour.chapterJump(-1))
+  document.getElementById('btn-chapter-next')?.addEventListener('click', () => tour.chapterJump(1))
+
+  tourBar?.addEventListener('pointerdown', (e) => {
+    const rect = tourBar.getBoundingClientRect()
+    tour.seek((e.clientX - rect.left) / rect.width)
   })
 
   // ── 彩蛋：键入 1999（金色奖杯）/ 1000（双色烟花 + 传奇墙）──
@@ -273,8 +309,13 @@ async function main() {
     eggs.update(dt)
     userDragged = false
 
+    landmarks.update(camera, renderer)
     controls.update()
     renderer.render(scene, camera)
+
+    if (tour.playing && tourFill) {
+      tourFill.style.width = `${(tour.progress * 100).toFixed(1)}%`
+    }
 
     if (acc === 0) {
       updateStats(

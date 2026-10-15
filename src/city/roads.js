@@ -13,7 +13,7 @@ import {
   normalizeForMerge,
 } from '../core/materials.js'
 
-export const ROAD_WIDTH = [14, 9, 5] // 主干 / 次干 / 支路，米
+export const ROAD_WIDTH = [16, 9, 5] // 主干 / 次干 / 支路，米（v2：主干加宽到 16m）
 const ROAD_Y = 1.0 // 略高于地面，避免 z-fighting
 const DASH_Y = 1.08 // 虚线略高于路面
 const RAIL_WIDTH = 3.4
@@ -213,7 +213,8 @@ export function createRoads(roads, rails) {
   for (const r of roads) {
     const k = Math.min(r.k ?? 2, 2)
     // 主干道保留更多细节（虚线沿它铺），次干/支路简化更狠
-    const flat = dpSimplify(r.p, k === 0 ? 2.5 : 4.5)
+    // v2：容差 4.5→3m，减少拐角"切角"感
+    const flat = dpSimplify(r.p, k === 0 ? 2.5 : 3)
     const geo = ribbonGeometry(flat, ROAD_WIDTH[k], ROAD_Y)
     if (geo) {
       normalizeForMerge(geo)

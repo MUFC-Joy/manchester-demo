@@ -90,14 +90,42 @@ export function createWater(water, waterways) {
     for (const g of polyGeos) g.dispose()
   }
 
-  // 线状水道
+  // 线状水道：先铺一层浅色岸线（宽 4m、低 12cm），水带叠在上面——读得出"这是河"（v2 问题八）
+  const bankGeos = []
   const lineGeos = []
   for (const w of waterways ?? []) {
-    const geo = ribbonGeometry(w.p, w.w ?? 8, WATERWAY_Y)
+    const width = w.w ?? 8
+    const bank = ribbonGeometry(w.p, width + 4, WATERWAY_Y - 0.12)
+    if (bank) {
+      normalizeForMerge(bank)
+      bankGeos.push(bank)
+    }
+    const geo = ribbonGeometry(w.p, width, WATERWAY_Y)
     if (geo) {
       normalizeForMerge(geo)
       lineGeos.push(geo)
     }
+  }
+
+  if (bankGeos.length) {
+    const merged = mergeGeometries(bankGeos, false)
+    if (merged) {
+      const cnt = merged.attributes.position.count
+      const c = new THREE.Color(PALETTE.waterBank)
+      const arr = new Float32Array(cnt * 3)
+      for (let i = 0; i < cnt; i++) {
+        arr[i * 3] = c.r
+        arr[i * 3 + 1] = c.g
+        arr[i * 3 + 2] = c.b
+      }
+      merged.setAttribute('color', new THREE.BufferAttribute(arr, 3))
+      merged.computeBoundingSphere()
+      const mesh = new THREE.Mesh(merged, getVertexColorMaterial())
+      mesh.name = 'waterway-banks'
+      mesh.matrixAutoUpdate = false
+      group.add(mesh)
+    }
+    for (const g of bankGeos) g.dispose()
   }
 
   if (lineGeos.length) {

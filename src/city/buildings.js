@@ -24,7 +24,9 @@ import { ll2xy, OT, ETIHAD } from '../core/geo.js'
 const RING_A_RADIUS = 600 // m
 const CORRIDOR_HALF_WIDTH = 900 // m
 const CENTRE_RADIUS = 1600 // m（围绕两场中点）
-const C_RING_MIN_AREA = 500 // m²
+// v2 P1：核心区收缩后三角形预算宽裕，C 环阈值从 500 降到 30（= 数据管线 MIN_AREA），
+// 联排住宅（30~100m²）全部找回——"每一条街都有楼"
+const C_RING_MIN_AREA = 30 // m²
 
 const OT_XY = ll2xy(OT.lat, OT.lon)
 const ET_XY = ll2xy(ETIHAD.lat, ETIHAD.lon)

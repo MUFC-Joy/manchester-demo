@@ -5,8 +5,8 @@
   --ink-dim: #93a3b3;
   --panel: rgba(14, 20, 28, 0.62);
   --edge: rgba(255, 255, 255, 0.12);
-  --ot: #c0392b;
-  --et: #4a90d9;
+  --ot: #d84a38;
+  --et: #5aa8f0;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
@@ -182,6 +182,122 @@ body {
   text-shadow: none;
 }
 
+/* ── 操作提示（v2 问题三：键位说明）── */
+#hint {
+  position: fixed;
+  left: 50%;
+  top: 22px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: #eef4f9;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 6px 14px;
+  backdrop-filter: blur(8px);
+  text-shadow: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ── Tour 控制条（v2 问题六：倍速 / 章节 / 进度）── */
+#tour-ctrl {
+  position: fixed;
+  left: 50%;
+  bottom: 118px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+  transition: opacity 0.3s ease;
+}
+
+.btn-mini {
+  font-size: 11.5px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  min-width: 64px;
+}
+
+.is-hidden {
+  opacity: 0;
+  pointer-events: none !important;
+}
+
+#tour-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  width: min(560px, 72vw);
+  height: 10px;
+  background: rgba(10, 16, 24, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.3s ease;
+}
+
+#tour-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(216, 74, 56, 0.9), rgba(90, 168, 240, 0.9));
+  border-radius: 5px;
+}
+
+/* ── 地标标签层（v2 问题七 / P5）── */
+#labels {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 3;
+}
+
+#labels[data-on='0'] {
+  display: none;
+}
+
+#labels .label {
+  position: absolute;
+  transform: translate(-50%, -130%);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  background: rgba(10, 16, 24, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 3px solid rgba(255, 255, 255, 0.5);
+  border-radius: 7px;
+  padding: 3px 9px 4px;
+  backdrop-filter: blur(4px);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+#labels .label .en {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #f4f8fb;
+}
+
+#labels .label .zh {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(238, 244, 249, 0.82);
+}
+
+#labels .label-ot {
+  border-left-color: var(--ot);
+}
+
+#labels .label-et {
+  border-left-color: var(--et);
+}
+
 /* ── 加载遮罩 ── */
 #loading {
   position: fixed;
@@ -240,5 +356,14 @@ body {
   #stats {
     font-size: 10.5px;
     padding: 5px 9px;
+  }
+  #hint {
+    display: none;
+  }
+  #tour-ctrl {
+    bottom: 108px;
+  }
+  #tour-bar {
+    bottom: 88px;
   }
 }

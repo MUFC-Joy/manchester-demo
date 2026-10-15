@@ -105,6 +105,13 @@ async function fetchTile(tile, attempt = 0) {
     }
 
     const json = await res.json()
+    // 空响应按失败处理：Overpass 拥塞时会对大查询返回合法但空的 JSON（D-011）。
+    // 城市分片不可能真的一个 way 都没有，宁可重试也不落盘空片。
+    if (!(json.elements?.length > 0)) {
+      throw Object.assign(new Error('Overpass 返回空 elements（拥塞/超时征兆）'), {
+        retryable: true,
+      })
+    }
     return json
   } finally {
     clearTimeout(timer)
@@ -152,16 +159,25 @@ async function main() {
     const tile = tiles[i]
     const outPath = path.join(RAW_DIR, `${area.label}_${tile.ix}_${tile.iy}.json`)
 
-    // 已存在则跳过（断点续传）
+    // 已存在则跳过（断点续传）。
+    // 必须校验 elements 数量：Overpass 超时/限流会返回"合法但空"的 JSON，
+    // 只看文件大小会把空分片当有效缓存跳过，整片区域永远缺失（D-011 教训）。
     try {
       const st = await fs.stat(outPath)
       if (st.size > 0) {
         const cached = JSON.parse(await fs.readFile(outPath, 'utf8'))
         const n = cached.elements?.length ?? 0
-        totalWays += n
-        totalBytes += st.size
-        console.log(`[${i + 1}/${tiles.length}] 已存在，跳过  ${path.basename(outPath)}  (${n} ways)`)
-        continue
+        if (n === 0) {
+          console.log(
+            `[${i + 1}/${tiles.length}] 已存在但为空（历史失败残留），删除重抓  ${path.basename(outPath)}`
+          )
+          await fs.rm(outPath)
+        } else {
+          totalWays += n
+          totalBytes += st.size
+          console.log(`[${i + 1}/${tiles.length}] 已存在，跳过  ${path.basename(outPath)}  (${n} ways)`)
+          continue
+        }
       }
     } catch {
       /* 不存在，正常抓取 */

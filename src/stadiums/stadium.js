@@ -93,6 +93,8 @@ export function createStadium(opts = {}) {
     // 屋顶按边分段：[0..7] 整圈；[0,2,4,6] 只保留四条长边 → 四块独立大顶 + 角部开口（老特拉福德特征）
     roofSegments = [0, 1, 2, 3, 4, 5, 6, 7],
     facadeThickness = 2.5,
+    teamRingColor = null, // 外立面顶圈队色（v2 问题四：远读性优先的风格化处理）
+    teamRingHeight = 3.5,
     seatColor = '#c0392b',
     seatSpacing = 2.4,
     floodlightHeight = 46,
@@ -226,6 +228,52 @@ export function createStadium(opts = {}) {
     const m = new THREE.Mesh(standGeo, getVertexColorMaterial())
     m.name = 'stands'
     group.add(m)
+  }
+
+  // ── 外立面顶圈队色环（v2 问题四：远看读得出"这是谁的家"）──
+  if (teamRingColor) {
+    const ringAcc = newAcc()
+    const ringCol = new THREE.Color(teamRingColor)
+    const y1 = topY
+    const y0 = topY - teamRingHeight
+    const eps = 0.1 // 沿外法线外推，避免和混凝土外墙 z-fighting
+
+    for (let i = 0; i < 8; i++) {
+      const j = (i + 1) % 8
+      const ax = facadeOuter[i][0]
+      const az = facadeOuter[i][1]
+      const bx = facadeOuter[j][0]
+      const bz = facadeOuter[j][1]
+      // 边的外法线（XZ 平面内，垂直于边、背离中心）
+      let nx = bz - az
+      let nz = -(bx - ax)
+      const nlen = Math.hypot(nx, nz) || 1
+      nx /= nlen
+      nz /= nlen
+      const midX = (ax + bx) / 2
+      const midZ = (az + bz) / 2
+      if (nx * midX + nz * midZ < 0) {
+        nx = -nx
+        nz = -nz
+      }
+
+      quad(
+        ringAcc,
+        [ax + nx * eps, y0, az + nz * eps],
+        [bx + nx * eps, y0, bz + nz * eps],
+        [bx + nx * eps, y1, bz + nz * eps],
+        [ax + nx * eps, y1, az + nz * eps],
+        [nx, 0, nz],
+        ringCol
+      )
+    }
+
+    const ringGeo = accToGeometry(ringAcc)
+    if (ringGeo) {
+      const m = new THREE.Mesh(ringGeo, getVertexColorMaterial())
+      m.name = 'team-ring'
+      group.add(m)
+    }
   }
 
   // ── 悬挑屋顶 ──

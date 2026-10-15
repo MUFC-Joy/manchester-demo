@@ -17,12 +17,13 @@ export function createOldTrafford(opts = {}) {
     rowDepth: 0.95,
     rowHeight: 0.78,
     bowlMargin: 13,
-    roofOverhang: 9,
+    roofOverhang: 5, // v2：缩短悬挑，让座椅海从上方露出来
     roofRise: 4.5,
     roofThickness: 2.2,
     // 只保留四条长边 → 四块独立大顶，角部留开口
     roofSegments: [0, 2, 4, 6],
     seatColor: PALETTE.seatOT,
+    teamRingColor: PALETTE.seatOT, // 外立面顶圈曼联红环
     seatSpacing: 2.4,
     floodlightHeight: 44,
     cornerCut: 0.24,

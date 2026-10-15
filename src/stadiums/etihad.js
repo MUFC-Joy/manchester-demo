@@ -17,12 +17,13 @@ export function createEtihad(opts = {}) {
     rowDepth: 0.92,
     rowHeight: 0.76,
     bowlMargin: 13,
-    roofOverhang: 8,
+    roofOverhang: 5, // v2：缩短悬挑，让座椅海从上方露出来
     roofRise: 3.6,
     roofThickness: 1.9,
     // 整圈连续屋顶
     roofSegments: [0, 1, 2, 3, 4, 5, 6, 7],
     seatColor: PALETTE.seatEtihad,
+    teamRingColor: PALETTE.seatEtihad, // 外立面顶圈天蓝环
     seatSpacing: 2.4,
     floodlightHeight: 38,
     cornerCut: 0.34, // 伊蒂哈德转角更圆

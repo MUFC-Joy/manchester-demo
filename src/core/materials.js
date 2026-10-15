@@ -13,13 +13,14 @@ export const PALETTE = {
   ground: '#d4d1c8',
   groundGrid: '#c2beb2',
 
-  // 道路分级（主干 / 次干 / 支路）——中灰沥青，压得住浅地面又不至于太狠
-  road: ['#4d5055', '#484a4f', '#43454a'],
+  // 道路分级（主干 / 次干 / 支路）——支路提亮一档，和主干拉开层次（v2 问题八）
+  road: ['#42454a', '#4b4e54', '#5a5d63'],
   rail: '#78787e',
 
-  // 水系（白天亮青蓝，夜晚由昼夜系统压暗）
-  water: '#6fb7d6',
-  waterway: '#6fb7d6',
+  // 水系（加深压暗贴近真实观感，夜晚由昼夜系统压得更深，v2 问题八）
+  water: '#4380a6',
+  waterway: '#4380a6',
+  waterBank: '#c9c3b4', // 河道岸线描边
 
   // 绿地（新鲜草绿）
   green: ['#7fb069', '#8fbe77'],
@@ -31,10 +32,11 @@ export const PALETTE = {
   // 球场
   standConcrete: '#b8b2a8',
   standRoof: '#8a847a',
-  seatOT: '#c0392b',
-  seatEtihad: '#4a90d9',
-  pitchStripeA: '#3f6b32',
-  pitchStripeB: '#477a38',
+  // 座椅提亮加饱和，远景读得出座椅海（v2 问题四）
+  seatOT: '#d84a38',
+  seatEtihad: '#5aa8f0',
+  pitchStripeA: '#37612a',
+  pitchStripeB: '#4e8c3b',
   pitchLine: '#dfe6df',
   goalPost: '#e8e8e8',
 
@@ -117,6 +119,8 @@ function makeWindowTextures() {
   for (const t of [dayTex, glowTex]) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping
     t.magFilter = THREE.NearestFilter // 窗格边缘锐利，保持方块感
+    // 斜视角远处的摩尔纹（看起来像马赛克）= 缺各向异性过滤（v2 问题七）
+    t.anisotropy = 8
     t.repeat.set(1 / WINDOW_TILE_W, 1 / WINDOW_TILE_H) // uv 单位 = 米
     t.colorSpace = THREE.SRGBColorSpace
   }
