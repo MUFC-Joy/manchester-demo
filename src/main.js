@@ -38,6 +38,7 @@ import { createDayNight } from './core/daynight.js'
 import { createEggs } from './egg/egg.js'
 
 import { initHud, setLoadingText, hideLoading, setTitle, updateStats } from './ui/hud.js'
+import { nextFrame } from './core/raf.js'
 
 // city.json 单独放 public/，运行时 fetch。
 // 若打进 JS 包体，6.7MB 的 JSON 会让手机端 JS 解析卡死（方案 §6.8 移动端不是可选项）。
@@ -62,7 +63,7 @@ async function main() {
 
   const tick = async (label, fn) => {
     setLoadingText(label)
-    await new Promise((r) => requestAnimationFrame(() => r()))
+    await new Promise((r) => nextFrame(() => r()))
     const t0 = performance.now()
     const out = fn()
     return { out, ms: performance.now() - t0 }
@@ -194,7 +195,7 @@ async function main() {
         .join('')
       chapterEl.classList.add('show')
       clearTimeout(chapterTimer)
-      chapterTimer = setTimeout(() => chapterEl.classList.remove('show'), 5200)
+      chapterTimer = setTimeout(() => chapterEl.classList.remove('show'), 8000) // v3：文字变长，给足阅读时间
     },
     onFinish() {
       btnTour.textContent = '▶ 一键 Tour'
@@ -246,6 +247,14 @@ async function main() {
   })
   btnLabels.classList.add('active')
 
+  // 折叠图例（v3 问题 5）：默认收起，不占空间
+  const btnLegend = document.getElementById('btn-legend')
+  const legendPanel = document.getElementById('legend-panel')
+  btnLegend?.addEventListener('click', () => {
+    const open = legendPanel.classList.toggle('is-hidden')
+    btnLegend.textContent = open ? '图例 ▾' : '图例 ▴'
+  })
+
   // Tour 倍速 / 章节跳转 / 进度条（v2 问题六）
   btnSpeed.addEventListener('click', () => {
     const idx = TOUR_SPEEDS.indexOf(tour.speed)
@@ -292,7 +301,7 @@ async function main() {
   let frames = 0
 
   function animate(now) {
-    requestAnimationFrame(animate)
+    nextFrame(animate)
 
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
@@ -329,7 +338,7 @@ async function main() {
     }
   }
 
-  requestAnimationFrame(animate)
+  nextFrame(animate)
 
   // 调试用：暴露到全局
   window.__manchester = { scene, camera, renderer, controls, ot: ot.out, etihad: etihad.out }

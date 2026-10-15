@@ -274,13 +274,19 @@ function classify(tags, closed) {
   if (tags.building && tags.building !== 'no') return 'building'
   if (tags['natural'] === 'water') return 'water'
   if (tags.waterway) {
-    // 隧道/暗渠/下水道不画：市政厅附近 4 条运河暗渠（Deansgate Tunnel 等）
-    // 画成明渠就是"楼底下冒河"（用户验收反馈）
-    if (tags.tunnel === 'yes' || tags.covered === 'yes' || tags.waterway === 'drain') return null
+    // 暗渠/隧道/下水道不画（v3 问题 7）：tunnel=culvert/yes 都是地下管，
+    // 画成明渠就是"居民楼下冒水"。tunnel 只认 'no'/未标注。
+    if (tags.tunnel && tags.tunnel !== 'no') return null
+    if (tags.waterway === 'drain') return null
     if (/tunnel/i.test(tags.name ?? '')) return null
     return 'waterway'
   }
-  if (tags.highway) return 'road'
+  if (tags.highway) {
+    // 道路白名单（v3 问题 6）：核心区 3.5 万条 highway 里 2.9 万条是
+    // footway/service/path/cycleway/steps——人行抄近道、停车车位道、台阶，
+    // 全画出来就是"黑线交织"。只保留机动车街道 + 步行街。
+    return ROAD_KEEP.has(tags.highway) ? 'road' : null
+  }
   if (tags.railway) {
     // 铁路只画"正在运营的走行线"（ Trafford Park 岔区实测：1,291 条里 604 条是
     // siding/spur/yard/crossover 岔道 + razed 已拆除 + abandoned/disused 废弃 +
@@ -303,6 +309,24 @@ function classify(tags, closed) {
   if (closed && GREEN_LANDUSE.has(tags.landuse)) return 'green'
   return null
 }
+
+/** 渲染的道路类型白名单（v3 问题 6） */
+const ROAD_KEEP = new Set([
+  'motorway',
+  'motorway_link',
+  'trunk',
+  'trunk_link',
+  'primary',
+  'primary_link',
+  'secondary',
+  'secondary_link',
+  'tertiary',
+  'tertiary_link',
+  'unclassified',
+  'residential',
+  'living_street',
+  'pedestrian',
+])
 
 /** 道路分级 → 色板索引 */
 function roadClass(tags) {
@@ -467,16 +491,20 @@ async function main() {
         } else if (kind === 'rail') {
           out.rails.push({ p: flat })
         } else {
-          // 宽度按真实尺度分级（用户验收反馈）：海船运河 ~50-100m（60），
-          // 普通城市运河（罗奇代尔/布里奇water）只有 ~10m，河 22m，小溪 9m。
-          // 此前统一 30m，把 10m 宽的罗奇代尔运河画宽 3 倍，蓝水漫到市政厅楼底。
-          const isShipCanal = /ship canal/i.test(tags.name ?? '')
+          // 宽度按真实尺度分级（v3 问题 7）：
+          //   海船运河 ~50-100m → 60；城市运河（罗奇代尔/布里奇water）~10m → 10
+          //   河：Irwell ~35m → 35；Medlock/Irk/Tib ~5m → 8；其他河 15
+          // 此前河统一 22m，5m 宽的 Medlock 被画宽 4 倍，蓝水漫进楼缝。
+          const nm = tags.name ?? ''
           out.waterways.push({
             p: flat,
             w:
               tags.waterway === 'canal'
-                ? isShipCanal ? 60 : 10
-                : tags.waterway === 'river' ? 22 : 9,
+                ? /ship canal/i.test(nm) ? 60 : 10
+                : tags.waterway === 'river'
+                  ? /irwell/i.test(nm) ? 35
+                    : /medlock|irk|tib/i.test(nm) ? 8 : 15
+                  : tags.waterway === 'stream' ? 5 : 6,
           })
         }
       }

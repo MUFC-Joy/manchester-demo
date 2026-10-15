@@ -236,6 +236,16 @@
 
 **运河宽度分级 + 暗渠剔除**：用户又指出市政厅楼下"有河流"。诊断：市政厅 700m 内的水是真实的罗奇代尔运河（Canal Street 同志村就在河边），但此前所有 waterway=canal 统一画 30m 宽——那是按海船运河调的，罗奇代尔运河真实只有 ~10m，被画宽 3 倍，蓝水漫进街区；且数据里有 4 条运河暗渠（Deansgate/Duke\u0027s/James Brindley\u0027s Coal Tunnel 等）被当明渠画。修复：宽度按名字分级（Ship Canal 60m / 其他运河 10m / 河 22m / 溪 9m），tunnel/covered/drain 一律不画。水道 214→190 段。地标标签 15→17（+罗奇代尔运河、曼彻斯特海船运河）。窗格 anisotropy 8→16。
 
+### 第三轮验收（v3，同日）
+
+用户三张新截图 + Tour 反馈，先立 docs/REVIEW-v3.md 再修：
+- Tour 卡顿 = getPointAt 每帧分配 2 个 Vector3 → GC 抖动，改 placeAt 零分配直写；
+- 字幕不同步 = 双层根因：①章节触发按"序号等分"而相机按"弧长匀速"，②缓动 e(t) 再扭一层——改成 ease(t) ≥ uOf(关键点) 触发、跳章用 easeInv 逆映射，逐章实测严格同步（详见 REVIEW-v3 验收结果）；
+- "黑线交织" = 28,813 条 footway/service/path/cycleway/steps 被当马路（真实街道仅 6,700），道路白名单后 27,168→6,486 段；
+- "居民楼下水流" = Medlock 河（真实 ~5m）画 22m + tunnel=culvert 漏过滤，河宽按名字分级（Irwell 35/Medlock 8）+ 暗渠剔除，190→163 段；
+- 图例改折叠面板（默认收起），补铁路/运河/主干道/绿地条目；解说 6→10 章；
+- 新增 core/raf.js：隐藏/遮挡窗口 rAF 被浏览器暂停导致构建卡"铺天空"，rAF+定时兜底赛跑。
+
 ### 踩的坑
 
 1. **伊蒂哈德灰巨环**：不是屋顶悬挑（v2 文档只对了一半），是 `building=grandstand` 逃过排除规则 → 按"语义半径"剔除而非标签字面值。

@@ -72,38 +72,86 @@ const LOOK_POINTS = [
 ].map(([x, y, z]) => new THREE.Vector3(x, y, z))
 
 /**
- * 章节表：index 为 CAM_POINTS 里的关键点序号，用于显示章节字幕。
+ * 章节表：at = 关键点序号（支持小数=段中），经 uOf() 换算到弧长轴触发。
  * parts 里 hl:true 的片段会以参考视频同款的高亮色渲染。
+ * 解说按用户反馈扩充到 10 章，史实均可查证（v3 问题 3）。
  */
 export const CHAPTERS = [
   {
     at: 0,
-    parts: [{ t: '从高空俯瞰这座' }, { t: '真实坐标上的方块城', hl: true }],
+    parts: [{ t: '从 3.4 公里高空俯瞰——' }, { t: '按真实坐标 1:1 重建', hl: true }, { t: '的方块城' }],
+  },
+  {
+    at: 1.5,
+    parts: [{ t: '25,183 栋建筑 · ' }, { t: '每一条街都有据可查', hl: true }],
   },
   {
     at: 3,
-    parts: [{ t: '沿运河飞向' }, { t: '老特拉福德', hl: true }],
+    parts: [{ t: '沿' }, { t: '曼彻斯特海船运河', hl: true }, { t: '——1894 年通航，内陆曼城直通大海' }],
   },
   {
     at: 6,
-    parts: [{ t: '梦剧场 · ' }, { t: '红色座椅海', hl: true }],
+    parts: [{ t: '梦剧场 · ' }, { t: '老特拉福德', hl: true }, { t: '：1910 年启用，74,310 座' }],
   },
   {
     at: 9,
-    parts: [{ t: '穿过' }, { t: '市中心', hl: true }, { t: '的走廊' }],
+    parts: [{ t: '告别红魔，穿过' }, { t: '城堡区', hl: true }, { t: '与' }, { t: '市中心', hl: true }],
+  },
+  {
+    at: 10.8,
+    parts: [{ t: '市政厅 · 中国城 · 北角区——' }, { t: '维多利亚时代的曼彻斯特', hl: true }],
   },
   {
     at: 12,
-    parts: [{ t: '伊蒂哈德 · ' }, { t: '蓝色座椅海', hl: true }],
+    parts: [{ t: '转向东：' }, { t: '菲利普斯公园', hl: true }, { t: '与东曼彻斯特' }],
+  },
+  {
+    at: 13,
+    parts: [{ t: '伊蒂哈德 · ' }, { t: '蓝色座椅海', hl: true }, { t: '：2002 年英联邦运动会主场，53,400 座' }],
   },
   {
     at: 16,
+    parts: [{ t: '两场相距 ' }, { t: '6.4 公里', hl: true }, { t: '——红蓝双雄割据一城' }],
+  },
+  {
+    at: 17,
     parts: [{ t: 'THIS IS ' }, { t: 'MANCHESTER', hl: true }],
   },
 ]
 
 const camCurve = new THREE.CatmullRomCurve3(CAM_POINTS, false, 'centripetal', 0.5)
 const lookCurve = new THREE.CatmullRomCurve3(LOOK_POINTS, false, 'centripetal', 0.5)
+
+// ── 弧长时间轴（v3 问题 2：字幕与视角同步的根）────────────────────────
+// getPointAt 按弧长匀速走，所以"相机什么时候到第 N 个关键点"必须用
+// 累计弧长占比，而不是 序号/总点数——跨城长段和绕场短段在序号上等权、
+// 在时间上差好几倍，旧写法的字幕必然漂移。
+const SEG_LEN = (() => {
+  const seg = []
+  let acc = 0
+  for (let i = 0; i < CAM_POINTS.length; i++) {
+    if (i > 0) acc += CAM_POINTS[i].distanceTo(CAM_POINTS[i - 1])
+    seg.push(acc)
+  }
+  return seg
+})()
+const TOTAL_LEN = SEG_LEN[SEG_LEN.length - 1]
+
+/** 关键点序号（支持小数=段中插值）→ 弧长进度 0~1 */
+export function uOf(idx) {
+  const i = Math.floor(idx)
+  const f = idx - i
+  const a = SEG_LEN[Math.min(i, SEG_LEN.length - 1)] / TOTAL_LEN
+  const b = SEG_LEN[Math.min(i + 1, SEG_LEN.length - 1)] / TOTAL_LEN
+  return a + (b - a) * f
+}
+
+// 缓动及其逆函数（v3 问题 2 第二层）：
+// 相机实际走的是 ease(t) 处的弧长位置，章节触发必须比较 ease(t)，
+// 否则缓动会把字幕再扭曲一次（前半程提前 / 后半程滞后）。
+const ease = (x) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2)
+const easeInv = (u) =>
+  u <= 0.5 ? Math.sqrt(u / 2) : 1 - Math.sqrt(2 * (1 - u)) / 2
 
 export const TOUR_DURATION = 78 // 秒
 export const TOUR_SPEEDS = [0.5, 1, 1.5, 2]
@@ -114,11 +162,16 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
   let chapterIdx = -1
   let speed = 1 // 倍速（v2 问题六）
 
-  /** 把相机摆到参数 t（0~1）对应的位置（位置/目标都按缓动曲线取） */
+  /**
+   * 把相机摆到参数 t（0~1）对应的位置（位置/目标都按缓动曲线取）。
+   * getPointAt(u, target) 直写已有向量——播放路径零堆分配（v3 问题 1：
+   * 每帧 2 个 Vector3 的 GC 停顿就是"一卡一卡"）。
+   */
   function placeAt(tRaw) {
     const e = tRaw < 0.5 ? 2 * tRaw * tRaw : 1 - Math.pow(-2 * tRaw + 2, 2) / 2
-    camera.position.copy(camCurve.getPointAt(Math.min(1, Math.max(0, e))))
-    controls.target.copy(lookCurve.getPointAt(Math.min(1, Math.max(0, e))))
+    const c = Math.min(1, Math.max(0, e))
+    camCurve.getPointAt(c, camera.position)
+    lookCurve.getPointAt(c, controls.target)
     controls.update()
   }
 
@@ -145,13 +198,13 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
     placeAt(t)
   }
 
-  /** 上一章 / 下一章：跳到章节起点（dir = -1 | 1） */
+  /** 上一章 / 下一章：跳到章节起点（dir = -1 | 1）。跳到 easeInv(u)，相机正好落在章节点 */
   const chapterJump = (dir) => {
     if (!playing) return
-    const n = CAM_POINTS.length - 1
+    const e = ease(t)
     let idx = 0
     for (let i = CHAPTERS.length - 1; i >= 0; i--) {
-      if (t >= CHAPTERS[i].at / n) {
+      if (e >= uOf(CHAPTERS[i].at)) {
         idx = i
         break
       }
@@ -159,10 +212,10 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
     // 前进：跳到下一章；后退：若已离开本章开头较多，先回本章开头
     let target = idx
     if (dir > 0) target = Math.min(CHAPTERS.length - 1, idx + 1)
-    else if (t - CHAPTERS[idx].at / n > 0.02) target = idx
+    else if (e - uOf(CHAPTERS[idx].at) > 0.02) target = idx
     else target = Math.max(0, idx - 1)
 
-    t = CHAPTERS[target].at / n + 0.001
+    t = Math.min(0.999, easeInv(uOf(CHAPTERS[target].at)) + 0.001)
     chapterIdx = -1
     placeAt(t)
   }
@@ -192,9 +245,10 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
 
     placeAt(t)
 
-    // 章节字幕
+    // 章节字幕：触发轴 = ease(t)（相机真实的弧长位置），和视角严格同步
+    const e = ease(t)
     for (let i = CHAPTERS.length - 1; i >= 0; i--) {
-      if (t >= CHAPTERS[i].at / (CAM_POINTS.length - 1)) {
+      if (e >= uOf(CHAPTERS[i].at)) {
         if (chapterIdx !== i) {
           chapterIdx = i
           onChapter?.(CHAPTERS[i].parts)
