@@ -130,9 +130,37 @@
 
 ### 下一步
 
-- [ ] 部署上线（`dist/` 已就绪，推 GitHub Pages 或用 sites 技能）
 - [ ] 手机实测 + 画质分级（IS_MOBILE 判定已写好）
 - [ ] 录屏成片（OBS，Tour 模式 + 手动环绕，60-90 秒）
+
+---
+
+## 会话 5 · 2026-10-15 · 部署上线
+
+**目标**：项目上传 GitHub 并开启 GitHub Pages 在线预览。
+
+### 做了什么
+
+- 本地仓库初始化（`.gitignore` 排除 node_modules / dist / data/raw），41 文件 / 4.7 MB，提交 `fce8126`
+- 通过 GitHub Desktop 推送到 `github.com/MUFC-Joy/manchester-demo`
+- 添加 Pages 自动部署工作流 `.github/workflows/deploy.yml`（提交 `1d95750`）：推送 main 即云端 `vite build` 并部署 dist/
+- 仓库改公开 + Pages Source 选 GitHub Actions（用户在网页端操作）
+- 上线验证（无头浏览器实测 https://mufc-joy.github.io/manchester-demo/ ）：
+  - HTTP 200，JS 包 622 KB / city.json 正常加载
+  - 控制台日志与本地一致：配准误差 0.0 m，LOD 分环 A 1031 / B 7728 / C 3325
+  - 像素统计：绿 45.8%（地面/绿地）、灰 19.3%（建筑/道路）、蓝 18.6%（天空/水系）、红 0.39%（球场座椅）——渲染完整
+  - 实拍截图存档：`docs/shot-live.png`
+
+### 卡在哪
+
+- shell 里的 git 推送用了过期凭据（macOS 钥匙串里的旧 token），推送统一走 GitHub Desktop 图形端解决
+- GitHub API 未认证请求限流（403 rate limit），验证改用公开 API 的缓存间隙完成
+
+### 下一步
+
+- [ ] 手机实测 + 画质分级（IS_MOBILE 判定已写好）
+- [ ] 录屏成片（OBS，Tour 模式 + 手动环绕，60-90 秒）
+- [ ] 可选：自定义域名 / README 补线上链接与截图
 
 ---
 
