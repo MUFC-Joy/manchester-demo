@@ -1,0 +1,21 @@
+{
+  "name": "manchester-demo",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Manchester blocky city demo — real geography, procedural stadiums, Three.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fetch-osm": "node scripts/fetch-osm.mjs",
+    "build-city": "node scripts/build-city-json.mjs",
+    "pipeline": "npm run fetch-osm && npm run build-city"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

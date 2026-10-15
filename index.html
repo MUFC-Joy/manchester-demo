@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MANCHESTER · 方块城市演示</title>
+  <link rel="stylesheet" href="./src/ui/style.css" />
+</head>
+<body>
+  <canvas id="app"></canvas>
+
+  <div id="hud">
+    <header id="hud-top">
+      <h1 id="title">MANCHESTER</h1>
+      <p id="subtitle">加载中…</p>
+    </header>
+
+    <footer id="hud-bottom">
+      <div id="controls">
+        <button id="btn-tour" class="btn btn-primary">▶ 一键 Tour</button>
+        <button id="btn-daynight" class="btn">🌙 夜景</button>
+        <button id="btn-free" class="btn">⟲ 自由视角</button>
+      </div>
+      <div id="legend">
+        <span class="lg lg-ot"><i></i>老特拉福德</span>
+        <span class="lg lg-et"><i></i>伊蒂哈德</span>
+      </div>
+      <div id="stats"></div>
+    </footer>
+
+    <div id="chapter"></div>
+  </div>
+
+  <div id="loading">
+    <div class="spin"></div>
+    <p id="loading-text">正在构建城市…</p>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
