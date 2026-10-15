@@ -1,8 +1,8 @@
 /**
  * landmarks.js — 轻量地标标签层（v2 问题七 / P5）
  *
- * 15 个中英双语标签（用户拍板：双语），每帧把锚点投影到屏幕坐标，
- * 纯 DOM 定位——15 个元素的开销可以忽略。
+ * 17 个中英双语标签（用户拍板：双语），每帧把锚点投影到屏幕坐标，
+ * 纯 DOM 定位——17 个元素的开销可以忽略。
  * 相机背面的标签自动隐藏；整体可由 HUD 按钮开关。
  */
 
@@ -25,6 +25,9 @@ const LANDMARKS = [
   { en: 'Chinatown', zh: '中国城', lat: 53.47670, lon: -2.24020, y: 8 },
   { en: 'Philips Park', zh: '菲利普斯公园', lat: 53.48480, lon: -2.20400, y: 6 },
   { en: 'Mayfield Park', zh: '梅菲尔德公园', lat: 53.47650, lon: -2.22950, y: 6 },
+  // 水系标签（用户问"这是真实的运河吗"——让地图自解释）
+  { en: 'Rochdale Canal', zh: '罗奇代尔运河', lat: 53.47490, lon: -2.23890, y: 5 },
+  { en: 'Manchester Ship Canal', zh: '曼彻斯特海船运河', lat: 53.46950, lon: -2.28800, y: 5 },
 ]
 
 export function createLandmarks() {

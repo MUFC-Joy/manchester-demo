@@ -119,8 +119,9 @@ function makeWindowTextures() {
   for (const t of [dayTex, glowTex]) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping
     t.magFilter = THREE.NearestFilter // 窗格边缘锐利，保持方块感
-    // 斜视角远处的摩尔纹（看起来像马赛克）= 缺各向异性过滤（v2 问题七）
-    t.anisotropy = 8
+    // 斜视角远处的摩尔纹（看起来像马赛克）= 缺各向异性过滤（v2 问题七）；
+    // 16 = 桌面 GPU 的常见上限，斜视角窗格比 8 再清晰一档
+    t.anisotropy = 16
     t.repeat.set(1 / WINDOW_TILE_W, 1 / WINDOW_TILE_H) // uv 单位 = 米
     t.colorSpace = THREE.SRGBColorSpace
   }

@@ -121,7 +121,7 @@ async function main() {
   const etihad = await tick('建造伊蒂哈德…', () => createEtihad())
   scene.add(etihad.out)
 
-  // ── 地标标签层（v2 P5：15 个中英双语，可开关）──
+  // ── 地标标签层（v2 P5：17 个中英双语，可开关）──
   const landmarksRes = await tick('挂地标标签…', () => createLandmarks())
   const landmarks = landmarksRes.out
 

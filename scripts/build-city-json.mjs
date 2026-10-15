@@ -273,7 +273,13 @@ function classify(tags, closed) {
   if (tags.building === 'stadium' || tags.leisure === 'stadium') return null
   if (tags.building && tags.building !== 'no') return 'building'
   if (tags['natural'] === 'water') return 'water'
-  if (tags.waterway) return 'waterway'
+  if (tags.waterway) {
+    // 隧道/暗渠/下水道不画：市政厅附近 4 条运河暗渠（Deansgate Tunnel 等）
+    // 画成明渠就是"楼底下冒河"（用户验收反馈）
+    if (tags.tunnel === 'yes' || tags.covered === 'yes' || tags.waterway === 'drain') return null
+    if (/tunnel/i.test(tags.name ?? '')) return null
+    return 'waterway'
+  }
   if (tags.highway) return 'road'
   if (tags.railway) {
     // 铁路只画"正在运营的走行线"（ Trafford Park 岔区实测：1,291 条里 604 条是
@@ -461,10 +467,16 @@ async function main() {
         } else if (kind === 'rail') {
           out.rails.push({ p: flat })
         } else {
+          // 宽度按真实尺度分级（用户验收反馈）：海船运河 ~50-100m（60），
+          // 普通城市运河（罗奇代尔/布里奇water）只有 ~10m，河 22m，小溪 9m。
+          // 此前统一 30m，把 10m 宽的罗奇代尔运河画宽 3 倍，蓝水漫到市政厅楼底。
+          const isShipCanal = /ship canal/i.test(tags.name ?? '')
           out.waterways.push({
             p: flat,
-            // 大运河最宽、河次之、小溪最窄（v2 问题八：分级明显）
-            w: tags.waterway === 'canal' ? 30 : tags.waterway === 'river' ? 22 : 9,
+            w:
+              tags.waterway === 'canal'
+                ? isShipCanal ? 60 : 10
+                : tags.waterway === 'river' ? 22 : 9,
           })
         }
       }
