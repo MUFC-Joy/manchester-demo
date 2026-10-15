@@ -72,15 +72,34 @@ const LOOK_POINTS = [
 ].map(([x, y, z]) => new THREE.Vector3(x, y, z))
 
 /**
- * 章节表：index 为 CAM_POINTS 里的关键点序号，用于显示章节字幕
+ * 章节表：index 为 CAM_POINTS 里的关键点序号，用于显示章节字幕。
+ * parts 里 hl:true 的片段会以参考视频同款的高亮色渲染。
  */
 export const CHAPTERS = [
-  { at: 0, name: '01 · 高空开场' },
-  { at: 3, name: '02 · 沿运河飞向老特拉福德' },
-  { at: 6, name: '03 · 梦剧场 · 红色座椅海' },
-  { at: 9, name: '04 · Metrolink 穿过市中心' },
-  { at: 12, name: '05 · 伊蒂哈德 · 蓝色座椅海' },
-  { at: 16, name: '06 · THIS IS MANCHESTER' },
+  {
+    at: 0,
+    parts: [{ t: '从高空俯瞰这座' }, { t: '真实坐标上的方块城', hl: true }],
+  },
+  {
+    at: 3,
+    parts: [{ t: '沿运河飞向' }, { t: '老特拉福德', hl: true }],
+  },
+  {
+    at: 6,
+    parts: [{ t: '梦剧场 · ' }, { t: '红色座椅海', hl: true }],
+  },
+  {
+    at: 9,
+    parts: [{ t: '穿过' }, { t: '市中心', hl: true }, { t: '的走廊' }],
+  },
+  {
+    at: 12,
+    parts: [{ t: '伊蒂哈德 · ' }, { t: '蓝色座椅海', hl: true }],
+  },
+  {
+    at: 16,
+    parts: [{ t: 'THIS IS ' }, { t: 'MANCHESTER', hl: true }],
+  },
 ]
 
 const camCurve = new THREE.CatmullRomCurve3(CAM_POINTS, false, 'centripetal', 0.5)
@@ -126,7 +145,8 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
       camera.position.copy(camCurve.getPointAt(1))
       controls.target.copy(lookCurve.getPointAt(1))
       controls.update()
-      return '06 · THIS IS MANCHESTER'
+      onChapter?.(CHAPTERS[CHAPTERS.length - 1].parts)
+      return CHAPTERS[CHAPTERS.length - 1]
     }
 
     // 缓动：前后稍慢，中段快
@@ -144,9 +164,9 @@ export function createTour(camera, controls, { onChapter, onFinish } = {}) {
       if (t >= CHAPTERS[i].at / (CAM_POINTS.length - 1)) {
         if (chapterIdx !== i) {
           chapterIdx = i
-          onChapter?.(CHAPTERS[i].name)
+          onChapter?.(CHAPTERS[i].parts)
         }
-        return CHAPTERS[i].name
+        return CHAPTERS[i]
       }
     }
     return null

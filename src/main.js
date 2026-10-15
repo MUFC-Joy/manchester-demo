@@ -1,7 +1,7 @@
 /**
  * main.js — 装配入口
  *
- * 流程：场景 → 地面 → 城市（建筑/道路/水/绿）→ 球场 → 相机 → HUD → 主循环
+ * 流程：场景 → 天空 → 地面 → 城市（建筑/道路/水/绿/树/路灯）→ 球场 → 相机 → HUD → 主循环
  *
  * 配准自检：两球场距离必须 ≈ 6.4 km，对不上说明投影或数据错了（方案 §6.1）。
  */
@@ -16,13 +16,17 @@ import {
   handleResize,
   IS_MOBILE,
 } from './core/scene.js'
-import { ll2xy, OT, ETIHAD, OT_ETIHAD_DISTANCE, PITCH } from './core/geo.js'
+import { ll2xy, OT, ETIHAD, OT_ETIHAD_DISTANCE } from './core/geo.js'
+import { getBuildingMaterial, getWaterMaterial } from './core/materials.js'
 
 import { createGround } from './city/ground.js'
 import { createBuildings } from './city/buildings.js'
 import { createRoads } from './city/roads.js'
 import { createWater } from './city/water.js'
 import { createGreen } from './city/green.js'
+import { createTrees, createBuildingGrid } from './city/trees.js'
+import { createStreetLights } from './city/streetlights.js'
+import { createSky } from './city/sky.js'
 
 import { createOldTrafford } from './stadiums/oldTrafford.js'
 import { createEtihad } from './stadiums/etihad.js'
@@ -30,7 +34,6 @@ import { createEtihad } from './stadiums/etihad.js'
 import { createControls } from './camera/controls.js'
 import { createTour } from './camera/tour.js'
 import { createDayNight } from './core/daynight.js'
-import { createNightWindows } from './city/nightLights.js'
 import { createEggs } from './egg/egg.js'
 
 import { initHud, setLoadingText, hideLoading, setTitle, updateStats } from './ui/hud.js'
@@ -64,6 +67,10 @@ async function main() {
     return { out, ms: performance.now() - t0 }
   }
 
+  // ── 天空（天穹 + 云，昼夜联动在下方注册） ──
+  const sky = await tick('铺天空…', () => createSky())
+  scene.add(sky.out.group)
+
   // ── 地面 ──
   const ground = await tick('铺设地面…', () => createGround(40000))
   scene.add(ground.out)
@@ -89,6 +96,22 @@ async function main() {
 
   const green = await tick('种植绿地…', () => createGreen(cityData.green))
   scene.add(green.out)
+
+  // ── 树 + 路灯（共用建筑包围盒空间哈希，避免"长在楼里"） ──
+  const grid = createBuildingGrid(cityData.buildings)
+
+  const trees = await tick('种树…', () =>
+    createTrees({
+      buildings: cityData.buildings,
+      roads: cityData.roads,
+      green: cityData.green,
+      grid,
+    })
+  )
+  scene.add(trees.out)
+
+  const lamps = await tick('立路灯…', () => createStreetLights(cityData.roads, grid))
+  scene.add(lamps.out.group)
 
   // ── 球场 ──
   const ot = await tick('建造老特拉福德…', () => createOldTrafford())
@@ -123,28 +146,50 @@ async function main() {
   console.log(
     `[建筑] A环 ${bStats.A} / B环 ${bStats.B} / C环 ${bStats.C} / 丢弃 ${bStats.dropped}`
   )
+  console.log(`[树] ${trees.out.userData.count} 棵 · [路灯] ${lamps.out.group.userData.count} 盏`)
   setTitle(
     'MANCHESTER',
     `${OT.name} · ${cityData.buildings.length} 栋建筑 · ` +
       `配准误差 ${regError.toFixed(0)} m`
   )
 
-  // ── 昼夜 + 城市窗光 ──
-  const dayNight = createDayNight(scene, lights, renderer)
-  const nightWindows = createNightWindows(cityData.buildings, maxH)
-  scene.add(nightWindows)
-  dayNight.registerWindows(nightWindows)
+  // ── 昼夜系统：把所有"跟着天色走"的东西注册进来 ──
+  const dayNight = createDayNight(scene, lights)
+  dayNight.registerWindows(getBuildingMaterial()) // 建筑窗格夜晚亮起
+  dayNight.registerDome(sky.out.setBlend) // 天穹顶点色重算
+  const groundPlane = ground.out.getObjectByName('ground-plane')
+  if (groundPlane) {
+    // 夜晚地面压到深灰蓝——视频的夜城地面比白天深一个数量级
+    dayNight.registerLerp(
+      groundPlane.material,
+      'color',
+      new THREE.Color('#d4d1c8'),
+      new THREE.Color('#3d424b')
+    )
+  }
+  dayNight.registerLerp(sky.out.cloudMat, 'color', new THREE.Color('#ffffff'), new THREE.Color('#33455e'))
+  dayNight.registerLerp(sky.out.cloudMat, 'emissiveIntensity', 0.5, 0.05)
+  dayNight.registerLerp(sky.out.cloudMat, 'opacity', 0.95, 0.5)
+  dayNight.registerLerp(getWaterMaterial(), 'color', new THREE.Color('#6fb7d6'), new THREE.Color('#0f2f47'))
+  dayNight.registerLerp(getWaterMaterial(), 'emissiveIntensity', 0.14, 0.4)
+  dayNight.registerLerp(lamps.out.poleMat, 'opacity', 0, 1, true) // 灯杆夜里显形
+  dayNight.registerLerp(lamps.out.headMat, 'opacity', 0, 1, true) // 路灯头夜里亮
+  dayNight.registerLerp(lamps.out.poolMat, 'opacity', 0, 0.18, true) // 地面光池
 
   // ── 相机 Tour ──
   const chapterEl = document.getElementById('chapter')
   let chapterTimer = null
   const tour = createTour(camera, controls, {
-    onChapter(name) {
+    onChapter(chapter) {
       if (!chapterEl) return
-      chapterEl.textContent = name
+      // 章节字幕：关键词高亮（参考视频同款的电影字幕条）
+      const parts = Array.isArray(chapter) ? chapter : [{ t: String(chapter) }]
+      chapterEl.innerHTML = parts
+        .map((p) => (p.hl ? `<span class="hl">${p.t}</span>` : p.t))
+        .join('')
       chapterEl.classList.add('show')
       clearTimeout(chapterTimer)
-      chapterTimer = setTimeout(() => chapterEl.classList.remove('show'), 4200)
+      chapterTimer = setTimeout(() => chapterEl.classList.remove('show'), 5200)
     },
     onFinish() {
       btnTour.textContent = '▶ 一键 Tour'
@@ -218,7 +263,7 @@ async function main() {
     acc += dt * 1000
     frames++
     if (acc >= 400) {
-      fps = frames / acc * 1000
+      fps = (frames / acc) * 1000
       acc = 0
       frames = 0
     }

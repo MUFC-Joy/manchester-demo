@@ -2,25 +2,29 @@
  * buildings.js — 建筑三环 LOD（方案 §6.2）
  *
  *   A 环（每球场半径 600m）  按真实 footprint 挤出 + 高度阶梯
- *   B 环（两场走廊 + 市中心） 简化 footprint，单位盒 InstancedMesh
- *   C 环（其余）             只保留大体量建筑剪影
+ *   B 环（两场走廊 + 市中心） 简化 footprint，同 A 环方式挤出
+ *   C 环（其余）             只保留大体量建筑，用简单盒子
  *
- * 每环合并成 1 个 draw call。
+ * 三环全部走"窗格贴图"材质：墙面 uv = 世界坐标（米），窗格按 6m×3m 对齐铺贴；
+ * 屋顶 uv 固定取样墙面空白点，不铺窗格。每环合并成 1 个 draw call。
  */
 
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import {
   buildingColor,
-  getVertexColorMaterial,
+  getBuildingMaterial,
   normalizeForMerge,
+  ROOF_UV,
+  WINDOW_TILE_W,
+  WINDOW_TILE_H,
 } from '../core/materials.js'
 import { ll2xy, OT, ETIHAD } from '../core/geo.js'
 
 const RING_A_RADIUS = 600 // m
 const CORRIDOR_HALF_WIDTH = 900 // m
 const CENTRE_RADIUS = 1600 // m（围绕两场中点）
-const C_RING_MIN_AREA = 400 // m²
+const C_RING_MIN_AREA = 500 // m²
 
 const OT_XY = ll2xy(OT.lat, OT.lon)
 const ET_XY = ll2xy(ETIHAD.lat, ETIHAD.lon)
@@ -66,6 +70,52 @@ function centroidAndArea(flat) {
   return { cx, cz, area: Math.abs(a) }
 }
 
+/**
+ * 挤出体的自定义 UV 生成器：
+ * - 侧面：uv 直接用顶点坐标（米），配合贴图 repeat(1/TILE) 实现世界坐标对齐的窗格
+ * - 顶/底面：固定取样墙面空白点，屋顶是干净的颜色而不是窗格
+ */
+function roofUVSet(n) {
+  const arr = []
+  for (let i = 0; i < n; i++) arr.push(new THREE.Vector2(ROOF_UV.x, ROOF_UV.y))
+  return arr
+}
+
+const extrudeUVGenerator = {
+  generateTopUV(_geometry, vertices) {
+    return roofUVSet(vertices.length / 3)
+  },
+  generateSideWallUV(_geometry, vertices, indexA, indexB, indexC, indexD) {
+    const ax = vertices[indexA * 3]
+    const ay = vertices[indexA * 3 + 1]
+    const az = vertices[indexA * 3 + 2]
+    const bx = vertices[indexB * 3]
+    const by = vertices[indexB * 3 + 1]
+    const bz = vertices[indexB * 3 + 2]
+    const cx = vertices[indexC * 3]
+    const cy = vertices[indexC * 3 + 1]
+    const cz = vertices[indexC * 3 + 2]
+    const dx = vertices[indexD * 3]
+    const dy = vertices[indexD * 3 + 1]
+    const dz = vertices[indexD * 3 + 2]
+    // u = 沿墙的水平坐标，v = 高度——世界坐标对齐，所有楼的窗格大小一致
+    if (Math.abs(ay - by) < Math.abs(ax - bx)) {
+      return [
+        new THREE.Vector2(ax, 1 - az),
+        new THREE.Vector2(bx, 1 - bz),
+        new THREE.Vector2(cx, 1 - cz),
+        new THREE.Vector2(dx, 1 - dz),
+      ]
+    }
+    return [
+      new THREE.Vector2(ay, 1 - az),
+      new THREE.Vector2(by, 1 - bz),
+      new THREE.Vector2(cy, 1 - cz),
+      new THREE.Vector2(dy, 1 - dz),
+    ]
+  },
+}
+
 /** footprint → 挤出棱柱（原点在底面，Y-up） */
 function extrudeFootprint(flat, height) {
   const shape = new THREE.Shape()
@@ -80,9 +130,38 @@ function extrudeFootprint(flat, height) {
     bevelEnabled: false,
     curveSegments: 1,
     steps: 1,
+    UVGenerator: extrudeUVGenerator,
   })
   geo.rotateX(-Math.PI / 2)
   return geo
+}
+
+/**
+ * C 环盒子：BoxGeometry 的 uv 是每面 0~1，按各面实际尺寸缩放成米，
+ * 顶/底面同样定到墙面空白点。
+ */
+function scaleBoxUV(geo, w, h, d) {
+  const uv = geo.attributes.uv
+  // 面序：+x -x +y -y +z -z；各面 (水平尺寸, 竖直尺寸)
+  const dims = [
+    [d, h], [d, h],
+    [w, d], [w, d],
+    [w, h], [w, h],
+  ]
+  for (let f = 0; f < 6; f++) {
+    for (let i = 0; i < 4; i++) {
+      const idx = f * 4 + i
+      if (f === 2 || f === 3) {
+        uv.setXY(idx, ROOF_UV.x, ROOF_UV.y)
+        continue
+      }
+      uv.setXY(
+        idx,
+        (uv.getX(idx) * dims[f][0]) / WINDOW_TILE_W,
+        (uv.getY(idx) * dims[f][1]) / WINDOW_TILE_H
+      )
+    }
+  }
 }
 
 /** 按 y 高度做伪 AO：底部压暗，顶部提亮 */
@@ -110,6 +189,17 @@ function classifyRing(cx, cz, area) {
   return area >= C_RING_MIN_AREA ? 'C' : null
 }
 
+/** 填充顶点色（整几何单色） */
+function fillVertexColor(geo, color) {
+  const col = new Float32Array(geo.attributes.position.count * 3)
+  for (let i = 0; i < col.length; i += 3) {
+    col[i] = color.r
+    col[i + 1] = color.g
+    col[i + 2] = color.b
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
+}
+
 export function createBuildings(buildings, maxHeight = 60) {
   const group = new THREE.Group()
   group.name = 'buildings'
@@ -129,28 +219,13 @@ export function createBuildings(buildings, maxHeight = 60) {
 
     const color = buildingColor(b.k, b.h, maxHeight)
 
-    if (ring === 'A') {
+    if (ring === 'A' || ring === 'B') {
       const geo = extrudeFootprint(b.p, b.h)
       normalizeForMerge(geo)
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3))
-      const c = color
-      const col = geo.attributes.color
-      for (let i = 0; i < col.count; i++) col.setXYZ(i, c.r, c.g, c.b)
+      fillVertexColor(geo, color)
       applyVerticalShading(geo, b.h)
-      geosA.push(geo)
-      stats.A++
-      stats.triangles += geo.index ? geo.index.count / 3 : geo.attributes.position.count / 3
-    } else if (ring === 'B') {
-      // 简化：直接用包围盒做单位盒实例的替代 —— 这里仍用挤出但跳过细节
-      const geo = extrudeFootprint(b.p, b.h)
-      normalizeForMerge(geo)
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3))
-      const c = color
-      const col = geo.attributes.color
-      for (let i = 0; i < col.count; i++) col.setXYZ(i, c.r, c.g, c.b)
-      applyVerticalShading(geo, b.h)
-      geosB.push(geo)
-      stats.B++
+      ;(ring === 'A' ? geosA : geosB).push(geo)
+      stats[ring]++
       stats.triangles += geo.attributes.position.count / 3
     } else {
       // C 环：只留大体量，用简单盒子代替
@@ -167,19 +242,17 @@ export function createBuildings(buildings, maxHeight = 60) {
       const w = Math.max(maxX - minX, 4)
       const d = Math.max(maxZ - minZ, 4)
       const geo = new THREE.BoxGeometry(w, b.h, d)
+      scaleBoxUV(geo, w, b.h, d)
       geo.translate((minX + maxX) / 2, b.h / 2, (minZ + maxZ) / 2)
       normalizeForMerge(geo)
-      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3))
-      const c = color
-      const col = geo.attributes.color
-      for (let i = 0; i < col.count; i++) col.setXYZ(i, c.r, c.g, c.b)
+      fillVertexColor(geo, color)
       geosC.push(geo)
       stats.C++
       stats.triangles += 12
     }
   }
 
-  const mat = getVertexColorMaterial()
+  const mat = getBuildingMaterial()
 
   for (const [geos, name] of [
     [geosA, 'ring-a'],

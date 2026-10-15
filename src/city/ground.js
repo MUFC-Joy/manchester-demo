@@ -1,7 +1,7 @@
 /**
  * ground.js — 地面底板
  *
- * 一块大平面 + 可选网格。网格不是装饰，它强化"方块/体素"的风格基调。
+ * 浅色"模型底座"风格（参考视频同款）：亮白地面 + 极淡的街区网格。
  */
 
 import * as THREE from 'three'
@@ -19,11 +19,11 @@ export function createGround(size = 40000) {
   plane.name = 'ground-plane'
   group.add(plane)
 
-  // 100m 网格：廉价地给城市加"格子"质感
+  // 100m 网格：淡淡的街区划分感，浅色地面上若隐若现
   const divisions = Math.min(400, Math.round(size / 100))
   const grid = new THREE.GridHelper(size, divisions, PALETTE.groundGrid, PALETTE.groundGrid)
   grid.position.y = 0.25
-  grid.material.opacity = 0.35
+  grid.material.opacity = 0.28
   grid.material.transparent = true
   grid.material.depthWrite = false
   grid.name = 'ground-grid'

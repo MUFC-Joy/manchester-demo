@@ -31,6 +31,9 @@ export function createRenderer(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2))
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.shadowMap.enabled = false // 全场景关阴影
+  // ACES 柔化高光：白墙风格下没有它，亮面会直接削平成纯白（视频的"软白"就来自这类滚降）
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.12
   return renderer
 }
 
